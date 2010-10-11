@@ -1,7 +1,6 @@
 from flask import Flask
-from flaskext.sqlalchemy import SQLAlchemy
 from local_settings import DATABASE_LOCATION
-from batman import db, app
+from batman_app import db, app
 
 class TimestampLink(db.Model):
     __tablename__ = 'timestamplink'
