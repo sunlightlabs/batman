@@ -52,18 +52,27 @@ def grab_daily_events(clip_id):
     page = urllib2.urlopen(url)
     add_date = datetime.datetime.now()
     soup = BeautifulSoup(page)
+    date_field = soup.findAll(text=re.compile('LEGISLATIVE DAY OF'))[0].strip()
+    date_string = time.strftime("%m/%d/%Y", time.strptime(date_field.replace('LEGISLATIVE DAY OF ', '').strip(), "%B %d, %Y"))
     groups = soup.findAll('blockquote')
+
+    proceeding = None #needs completion
     for group in groups:
-        if group.nextSibling.nextSibling:
+        if group.nextSibling.nextSibling: 
+            timestamp = None #needs completion
+            offset = int(group.nextSibling.nextSibling.a['onclick'].replace("top.SetPlayerPosition('0:", "").replace("',null); return false;", ""))
+            
             fe = FloorEvent()
             fe.add_date = add_date
-            fe.offset = int(group.nextSibling.nextSibling.a['onclick'].replace("top.SetPlayerPosition('0:", "").replace("',null); return false;", ""))
-            #fe.timestamp = 
+            fe.timestamp = timestamp
+            fe.offset = offset
+            desc_group = group.findNext('p')
             
-            
-            
-            print offset
         
+        print desc_group
+        print "\n"
+            
+                    
 grab_daily_meta()
 #grab_daily_events(4679)
 
