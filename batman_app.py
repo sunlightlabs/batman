@@ -16,12 +16,6 @@ db = SQLAlchemy(app)
 def home():
     return 'test'
 
-@app.after_request
-def shutdown_session(response):
-    db_session.remove()
-    return response
-
-
 
 if __name__ == '__main__':
     app.run()
