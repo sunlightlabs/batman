@@ -36,7 +36,7 @@ def grab_daily_meta():
         if len(cols) > 0:
             fd = FloorDate()
             fd.proceeding_unix_time = cols[0].span.string
-            fd.proceeding_date = cols[0].contents[1]
+            fd.proceeding_date = time.strftime('%Y-%m-%d', time.strptime(cols[0].contents[1], '%B %d, %Y'))
             fd.add_date = add_date
             duration_hours = cols[1].contents[0]
             duration_minutes = cols[1].contents[2].replace('&nbsp;', '')
@@ -47,4 +47,25 @@ def grab_daily_meta():
             fd.wmv_url = fd.mp3_url.replace('.mp3', '.wmv')
             fd.save()
             
+def grab_daily_events(clip_id):
+    url = "http://houselive.gov/MinutesViewer.php?view_id=2&clip_id=%s&event_id=&publish_id=&is_archiving=0&embedded=1&camera_id=" % clip_id
+    page = urllib2.urlopen(url)
+    add_date = datetime.datetime.now()
+    soup = BeautifulSoup(page)
+    groups = soup.findAll('blockquote')
+    for group in groups:
+        if group.nextSibling.nextSibling:
+            fe = FloorEvent()
+            fe.add_date = add_date
+            fe.offset = int(group.nextSibling.nextSibling.a['onclick'].replace("top.SetPlayerPosition('0:", "").replace("',null); return false;", ""))
+            #fe.timestamp = 
+            
+            
+            
+            print offset
+        
 grab_daily_meta()
+#grab_daily_events(4679)
+
+
+
