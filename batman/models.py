@@ -1,6 +1,12 @@
 from flask import Flask
+from flaskext.sqlalchemy import SQLAlchemy
 from local_settings import DATABASE_LOCATION
-from batman_app import db, app
+#from batman_app import db, app
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_LOCATION
+
+db = SQLAlchemy()
+db.init_app(app)
 
 def create_all_db():
     global db, app
