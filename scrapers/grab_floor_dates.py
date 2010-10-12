@@ -5,12 +5,10 @@
 from BeautifulSoup import BeautifulSoup, SoupStrainer
 from urlparse import urlparse
 import datetime, time
-#from FloorDate import FloorDate, FloorEvent
 from batman.models import FloorEvent, FloorDate
 import urllib2
 import re
 
-        
 def convert_duration(hours, minutes):
     hours = int(hours)
     minutes = int(minutes)
@@ -65,16 +63,23 @@ def grab_daily_events(clip_id):
             timestamp = None #needs completion
             offset = int(group.nextSibling.nextSibling.a['onclick'].replace("top.SetPlayerPosition('0:", "").replace("',null); return false;", ""))
             print "offset: %s" % offset
-            fe = FloorEvent()
-            fe.add_date = add_date
-            fe.timestamp = timestamp
-            fe.offset = offset
             desc_group = group.findNext('p')
             
             pt = group.findNext('p')
+            weight = 0
             while pt.name == 'p':
                 if (len(pt.contents) > 0):
-                    print(pt.contents[0])
+                    if(len(pt.contents) == 1):
+                        fe = FloorEvent()
+                        fe.add_date = add_date
+                        fe.timestamp = timestamp
+                        fe.offset = offset
+                        fe.description = pt.contents[0].strip()
+                        fe.weight = weight
+                        weight = weight + 1
+                        print fe.description
+                    else:
+                        print pt.contents
                 if hasattr(pt.nextSibling, 'name'):
                     pt = pt.nextSibling
                 else:
