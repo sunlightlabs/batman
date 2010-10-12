@@ -5,9 +5,11 @@
 from BeautifulSoup import BeautifulSoup, SoupStrainer
 from urlparse import urlparse
 import datetime, time
-from FloorDate import FloorDate, FloorEvent
+#from FloorDate import FloorDate, FloorEvent
+from batman.models import FloorEvent, FloorDate
 import urllib2
 import re
+
         
 def convert_duration(hours, minutes):
     hours = int(hours)

@@ -10,7 +10,8 @@ app = Flask(__name__)
 app.secret_key = SECRET_KEY
 app.debug = DEBUG
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_LOCATION
-db = SQLAlchemy(app)
+db = SQLAlchemy()
+db.init_app(app)
 
 @app.route('/')
 def home():
