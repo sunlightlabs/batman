@@ -5,12 +5,10 @@
 from BeautifulSoup import BeautifulSoup, SoupStrainer
 from urlparse import urlparse
 import datetime, time
-#from FloorDate import FloorDate, FloorEvent
 from batman.models import FloorEvent, FloorDate
 import urllib2
 import re
 
-        
 def convert_duration(hours, minutes):
     hours = int(hours)
     minutes = int(minutes)
@@ -54,29 +52,39 @@ def grab_daily_events(clip_id):
     page = urllib2.urlopen(url)
     add_date = datetime.datetime.now()
     soup = BeautifulSoup(page)
+    print soup.prettify()
     date_field = soup.findAll(text=re.compile('LEGISLATIVE DAY OF'))[0].strip()
     date_string = time.strftime("%m/%d/%Y", time.strptime(date_field.replace('LEGISLATIVE DAY OF ', '').strip(), "%B %d, %Y"))
     groups = soup.findAll('blockquote')
 
     proceeding = None #needs completion
     for group in groups:
-        if group.nextSibling.nextSibling: 
+        if group.nextSibling.nextSibling:
             timestamp = None #needs completion
             offset = int(group.nextSibling.nextSibling.a['onclick'].replace("top.SetPlayerPosition('0:", "").replace("',null); return false;", ""))
-            
-            fe = FloorEvent()
-            fe.add_date = add_date
-            fe.timestamp = timestamp
-            fe.offset = offset
+            print "offset: %s" % offset
             desc_group = group.findNext('p')
             
-        
-        print desc_group
+            pt = group.findNext('p')
+            weight = 0
+            while pt.name == 'p':
+                if (len(pt.contents) > 0):
+                    if(len(pt.contents) == 1):
+                        fe = FloorEvent()
+                        fe.add_date = add_date
+                        fe.timestamp = timestamp
+                        fe.offset = offset
+                        fe.description = pt.contents[0].strip()
+                        fe.weight = weight
+                        weight = weight + 1
+                        print fe.description
+                    else:
+                        print pt.contents
+                if hasattr(pt.nextSibling, 'name'):
+                    pt = pt.nextSibling
+                else:
+                    break
         print "\n"
-            
-                    
-grab_daily_meta()
-#grab_daily_events(4679)
-
-
-
+                        
+#grab_daily_meta()
+grab_daily_events(4679)

@@ -24,8 +24,7 @@ def drop_all_db():
 
 class FloorDate(db.Model):
     __tablename__ = 'floordate'
-    id = db.Column(db.Integer, primary_key=True)
-    proceeding_unix_time = db.Column(db.Integer)
+    proceeding_unix_time = db.Column(db.Integer, primary_key=True)
     proceeding_date = db.Column(db.Date)
     add_date = db.Column(db.DateTime)
     duration = db.Column(db.Integer)
@@ -41,7 +40,7 @@ class FloorDate(db.Model):
 class FloorEvent(db.Model):
     __tablename__ = 'floorevent'
     id = db.Column(db.Integer, primary_key=True)
-    proceeding = db.Column(db.ForeignKey(FloorDate.id))
+    proceeding = db.Column(db.ForeignKey(FloorDate.proceeding_unix_time))
     add_date = db.Column(db.DateTime)
     timestamp = db.Column(db.DateTime)
     offset = db.Column(db.Integer)
