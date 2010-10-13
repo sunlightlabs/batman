@@ -5,7 +5,7 @@
 from BeautifulSoup import BeautifulSoup, SoupStrainer
 from urlparse import urlparse
 import datetime, time
-from batman.models import FloorEvent, FloorDate
+from batman.models import FloorEvent, FloorDate, get_or_create_floor_event
 import urllib2
 import re
 
@@ -22,7 +22,7 @@ def locate_clip_id(url):
         if param.split('=')[0] == 'clip_id':
             clip_id = param.split('=')[1]
     return int(clip_id)
-            
+ 
 def grab_daily_meta():
     url = "http://houselive.gov/ViewPublisher.php?view_id=14"
     page = urllib2.urlopen(url)
@@ -46,6 +46,8 @@ def grab_daily_meta():
             fd.mp4_url = fd.mp3_url.replace('.mp3', '.mp4')
             fd.wmv_url = fd.mp3_url.replace('.mp3', '.wmv')
             fd.save()
+
+            grab_daily_events(fd.clip_id)
             
 def grab_daily_events(clip_id):
     url = "http://houselive.gov/MinutesViewer.php?view_id=2&clip_id=%s&event_id=&publish_id=&is_archiving=0&embedded=1&camera_id=" % clip_id
@@ -56,8 +58,7 @@ def grab_daily_events(clip_id):
     date_field = soup.findAll(text=re.compile('LEGISLATIVE DAY OF'))[0].strip()
     date_string = time.strftime("%m/%d/%Y", time.strptime(date_field.replace('LEGISLATIVE DAY OF ', '').strip(), "%B %d, %Y"))
     groups = soup.findAll('blockquote')
-
-    proceeding = None #needs completion
+    proceeding = FloorDate.query.filter_by(clip_id=clip_id).first() # None #needs completion
     for group in groups:
         if group.nextSibling.nextSibling:
             timestamp = None #needs completion
@@ -70,14 +71,15 @@ def grab_daily_events(clip_id):
             while pt.name == 'p':
                 if (len(pt.contents) > 0):
                     if(len(pt.contents) == 1):
-                        fe = FloorEvent()
+                        fe = get_or_create_floor_event(proceeding, timestamp, weight)
                         fe.add_date = add_date
                         fe.timestamp = timestamp
                         fe.offset = offset
                         fe.description = pt.contents[0].strip()
                         fe.weight = weight
                         weight = weight + 1
-                        print fe.description
+                        #print fe.description
+                        fe.save()
                     else:
                         print pt.contents
                 if hasattr(pt.nextSibling, 'name'):

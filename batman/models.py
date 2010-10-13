@@ -22,6 +22,7 @@ def drop_all_db():
     db.drop_all()
     con.pop()
 
+
 class FloorDate(db.Model):
     __tablename__ = 'floordate'
     proceeding_unix_time = db.Column(db.Integer, primary_key=True)
@@ -51,3 +52,15 @@ class FloorEvent(db.Model):
     def save(self):
         db.session.add(self)
         db.session.commit()
+        
+
+def get_or_create_floor_event(proceeding, timestamp, weight):
+    current = FloorEvent.query.filter_by(proceeding=proceeding, weight=weight).first()
+    if current:
+        return current
+    else:
+        fe = FloorEvent()
+        fe.proceeding = proceeding
+        fe.timestamp = timestamp
+        fe.weight = weight
+        return fe
