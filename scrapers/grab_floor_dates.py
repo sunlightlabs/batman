@@ -50,6 +50,56 @@ def grab_daily_meta():
             grab_daily_events(fd.clip_id)
             
 def grab_daily_events(clip_id):
+    
+    def get_timestamp(item, date, am_or_pm):
+        timestamp = item.nextSibling.nextSibling.a.string
+        minutes = int(re.findall('(?<=:)\d+', timestamp)[0])
+        if re.findall('PM', timestamp):
+            hours = int(re.findall('\d+(?=:)', timestamp)[0])
+            if hours != 12:
+                hours += 12 #convert to 24 clock
+            if am_or_pm == 'AM':
+                date -= datetime.timedelta(days=1) #we're into the original legislative day now
+                am_or_pm = 'PM'
+        else: 
+            hours = int(re.findall('\d+(?=:)', timestamp)[0])
+            if hours == 12:
+                hours = 0  #12 am is 0 on 24 hours clock
+            am_or_pm = 'AM'
+        
+        return (datetime.datetime(date.year, date.month, date.day, hours, minutes), date, am_or_pm)
+
+    def parse_group(pt, timestamp, proceeding, offset):
+#        pt = group.findNext('p')
+        weight = 0
+        while pt.name == 'p':
+            if (len(pt.contents) > 0):
+                text = None
+                if(len(pt.contents) == 1):
+                    text = pt.contents[0]
+                else:
+                    text = ''.join(pt.findAll(text=True)) #get rid of formatting tags
+                    if pt.findAll('a'):
+                        pass
+                        #need to parse links here
+                   
+                if text:
+                    fe = get_or_create_floor_event(proceeding, timestamp, weight)
+                    fe.add_date = add_date
+                    fe.timestamp = timestamp
+                    fe.offset = offset
+                    fe.description = text.strip()
+                    fe.weight = weight
+                    weight = weight + 1
+                    fe.save()
+                else:
+                    print "can't parse text "
+                    print pt.contents
+            if hasattr(pt.nextSibling, 'name'):
+                pt = pt.nextSibling
+            else:
+                break
+
     url = "http://houselive.gov/MinutesViewer.php?view_id=2&clip_id=%s&event_id=&publish_id=&is_archiving=0&embedded=1&camera_id=" % clip_id
     page = urllib2.urlopen(url)
     add_date = datetime.datetime.now()
@@ -65,53 +115,25 @@ def grab_daily_events(clip_id):
     else:
         date = proceeding.proceeding_date
 
+    #special case for first group that's before the first blockquote
+    first_group = soup.find('style')
+    groups.insert(0, first_group)
+    first_offset = int(first_group.nextSibling.nextSibling.a['onclick'].replace("top.SetPlayerPosition('0:", "").replace("',null); return false;", ""))
+    timestamp, date, am_or_pm = get_timestamp(first_group, date, am_or_pm)
+    parse_group(first_group, timestamp, proceeding, first_offset)
+
+#    groups.insert(0, first_group)
     for group in groups:
         if group.nextSibling.nextSibling:
-            timestamp = group.nextSibling.nextSibling.a.string
-            print timestamp
-            minutes = int(re.findall('(?<=:)\d+', timestamp)[0])
-            if re.findall('PM', timestamp):
-                t_hours = int(re.findall('\d+(?=:)', timestamp)[0])
-                if t_hours != 12:
-                    hours = 12 + t_hours #convert to 24 clock
-                if am_or_pm == 'AM':
-                    date -= datetime.timedelta(days=1) #we're into the original legislative day now
-                    am_or_pm = 'PM'
-            else: 
-                hours = int(re.findall('\d+(?=:)', timestamp)[0])
-                if hours == 12:
-                    hours = 0  #12 am is 0 on 24 hours clock
-                am_or_pm = 'AM'
-            
-            timestamp = datetime.datetime(date.year, date.month, date.day, hours, minutes)
-            
-            print timestamp
-
             offset = int(group.nextSibling.nextSibling.a['onclick'].replace("top.SetPlayerPosition('0:", "").replace("',null); return false;", ""))
-            print "offset: %s" % offset
+            timestamp, date, am_or_pm = get_timestamp(group, date, am_or_pm)
             desc_group = group.findNext('p')
-            
-            pt = group.findNext('p')
-            weight = 0
-            while pt.name == 'p':
-                if (len(pt.contents) > 0):
-                    if(len(pt.contents) == 1):
-                        fe = get_or_create_floor_event(proceeding, timestamp, weight)
-                        fe.add_date = add_date
-                        fe.timestamp = timestamp
-                        fe.offset = offset
-                        fe.description = pt.contents[0].strip()
-                        fe.weight = weight
-                        weight = weight + 1
-                        #print fe.description
-                        fe.save()
-                    else:
-                        print pt.contents
-                if hasattr(pt.nextSibling, 'name'):
-                    pt = pt.nextSibling
-                else:
-                    break
-        print "\n"
+            parse_group(desc_group, timestamp, proceeding, offset)
+        
+        else:
+            print "no a tag"
+            print group.nextSibling
+            #print "\n"
                         
 #grab_daily_meta()
 grab_daily_events(4679)
