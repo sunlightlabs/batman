@@ -42,6 +42,33 @@ def house_feed():
                     items = rss_items
                     )
     return rss.to_xml()
+
+@app.route('/house/day/<day>')
+def house_day_feed(day):
+    rss_items = []
+    proceeding = FloorDate.query.get(proceeding_unix_time)
+    events = FloorEvent.query.filter_by(proceeding=day).order_by(timestamp)
+    for e in events:
+        weights = events.filter_by(timestamp=e.timestamp).order_by(weight)
+        text = []
+        for w in weights:
+            text.append(w.description)
+        
+        event_item = pyrss.RSSItem(
+                                    title = "%s - %s" % (proceeding.porceeding_date, e.timestamp),
+                                    link = proceeding.mp4_url,
+                                    description = ''.join(text),
+                                    pubDate = str(proceeding.add_date)
+                                    )
+    rss = pyrss.RSS2(
+                    title = 'HouseLive.gov Video for %s' % proceeding.proceeding_date,
+                    link = "http://batman.sunlightlabs.com/house/day/%s" % day,
+                    description = 'HouseLive.gov Video',
+                    lastBuildDate = "%s" % proceeding.add_date,
+                    items = rss_items
+                    )
+    return rss.to_xml()
+
 @app.route('/')
 def home():
     my_str = ''

@@ -26,7 +26,7 @@ def drop_all_db():
 class FloorDate(db.Model):
     __tablename__ = 'floordate'
     proceeding_unix_time = db.Column(db.Integer, primary_key=True)
-    proceeding_date = db.Column(db.Date)
+    proceeding_date = db.Column(db.DateTime)
     add_date = db.Column(db.DateTime)
     duration = db.Column(db.Integer)
     clip_id = db.Column(db.Integer)
@@ -40,13 +40,12 @@ class FloorDate(db.Model):
 
 class FloorEvent(db.Model):
     __tablename__ = 'floorevent'
-    id = db.Column(db.Integer, primary_key=True)
     proceeding = db.Column(db.ForeignKey(FloorDate.proceeding_unix_time))
     add_date = db.Column(db.DateTime)
-    timestamp = db.Column(db.DateTime)
+    timestamp = db.Column(db.DateTime, primary_key=True)
     offset = db.Column(db.Integer)
     description = db.Column(db.Text)
-    weight = db.Column(db.Integer)
+    weight = db.Column(db.Integer, primary_key=True)
     legislation = db.Column(db.Text)
 
     def save(self):
@@ -64,3 +63,13 @@ def get_or_create_floor_event(proceeding, timestamp, weight):
         fe.timestamp = timestamp
         fe.weight = weight
         return fe
+
+def get_or_create_floor_date(unix_time):
+    current = FloorDate.query.filter_by(proceeding_unix_time=unix_time).first()
+    if current:
+        return current
+    current = FloorDate()
+    current.proceeding_unix_time = unix_time
+    return current
+
+

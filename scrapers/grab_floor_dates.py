@@ -5,7 +5,7 @@
 from BeautifulSoup import BeautifulSoup, SoupStrainer
 from urlparse import urlparse
 import datetime, time
-from batman.models import FloorEvent, FloorDate, get_or_create_floor_event
+from batman.models import FloorEvent, FloorDate, get_or_create_floor_event, get_or_create_floor_date
 import urllib2
 import re
 
@@ -34,8 +34,10 @@ def grab_daily_meta():
     for row in rows:
         cols = row.findAll('td')
         if len(cols) > 0:
-            fd = FloorDate()
-            fd.proceeding_unix_time = cols[0].span.string
+            
+            unix_time = cols[0].span.string
+            fd = get_or_create_floor_date(unix_time)
+            fd.proceeding_unix_time = unix_time
             fd.proceeding_date = time.strftime('%Y-%m-%d', time.strptime(cols[0].contents[1], '%B %d, %Y'))
             fd.add_date = add_date
             duration_hours = cols[1].contents[0]
@@ -47,12 +49,16 @@ def grab_daily_meta():
             fd.wmv_url = fd.mp3_url.replace('.mp3', '.wmv')
             fd.save()
 
-            grab_daily_events(fd.clip_id)
+            grab_daily_events(fd.proceeding_unix_time)
             
-def grab_daily_events(clip_id):
+def grab_daily_events(fd_unix_time):
     
     def get_timestamp(item, date, am_or_pm):
-        timestamp = item.nextSibling.nextSibling.a.string
+        try:
+            timestamp = item.nextSibling.nextSibling.a.string
+        except:
+            timestamp = item.nextSibling.nextSibling.string
+
         minutes = int(re.findall('(?<=:)\d+', timestamp)[0])
         if re.findall('PM', timestamp):
             hours = int(re.findall('\d+(?=:)', timestamp)[0])
@@ -70,7 +76,7 @@ def grab_daily_events(clip_id):
         return (datetime.datetime(date.year, date.month, date.day, hours, minutes), date, am_or_pm)
 
     def parse_group(pt, timestamp, proceeding, offset):
-#        pt = group.findNext('p')
+        pt = group.findNext('p')
         weight = 0
         while pt.name == 'p':
             if (len(pt.contents) > 0):
@@ -82,15 +88,14 @@ def grab_daily_events(clip_id):
                     if pt.findAll('a'):
                         pass
                         #need to parse links here
-                   
                 if text:
-                    fe = get_or_create_floor_event(proceeding, timestamp, weight)
+                    fe = get_or_create_floor_event(proceeding.proceeding_unix_time, timestamp, weight)
                     fe.add_date = add_date
                     fe.timestamp = timestamp
                     fe.offset = offset
                     fe.description = text.strip()
                     fe.weight = weight
-                    weight = weight + 1
+                    weight += 1
                     fe.save()
                 else:
                     print "can't parse text "
@@ -100,34 +105,38 @@ def grab_daily_events(clip_id):
             else:
                 break
 
-    url = "http://houselive.gov/MinutesViewer.php?view_id=2&clip_id=%s&event_id=&publish_id=&is_archiving=0&embedded=1&camera_id=" % clip_id
-    page = urllib2.urlopen(url)
+    proceeding = FloorDate.query.get(fd_unix_time) #FloorDate.query.filter_by(clip_id=clip_id).first() # None #needs completion
+    url = "http://houselive.gov/MinutesViewer.php?view_id=2&clip_id=%s&event_id=&publish_id=&is_archiving=0&embedded=1&camera_id=" % proceeding.clip_id
+    page = urllib2.urlopen(url).read()
     add_date = datetime.datetime.now()
-    soup = BeautifulSoup(page)
-   # print soup.prettify()
+    soup = BeautifulSoup(page.replace("<p />", "</p><p>"))
     date_field = soup.findAll(text=re.compile('LEGISLATIVE DAY OF'))[0].strip()
     date_string = time.strftime("%m/%d/%Y", time.strptime(date_field.replace('LEGISLATIVE DAY OF ', '').strip(), "%B %d, %Y"))
     groups = soup.findAll('blockquote')
-    proceeding = FloorDate.query.filter_by(clip_id=clip_id).first() # None #needs completion
-    am_or_pm = re.findall('AM|PM', groups[0].nextSibling.nextSibling.a.string)[0]
+    print proceeding.proceeding_unix_time
+    
+    try:
+        am_or_pm = re.findall('AM|PM|A.M|P.M', groups[0].nextSibling.nextSibling.a.string)[0]
+    except Exception:
+        print groups[0].nextSibling.nextSibling.string
+        am_or_pm = re.findall('AM|PM|A.M|P.M', groups[0].nextSibling.nextSibling.string)[0].replace('.', '')
+
     if am_or_pm == 'AM': #finishing after midnight, record is being read in backwards
-        date = proceeding.proceeding_date + datetime.timedelta(days=1)
+        date = datetime.datetime.fromtimestamp(float(proceeding.proceeding_unix_time)) + datetime.timedelta(days=1)
     else:
-        date = proceeding.proceeding_date
+        date = datetime.datetime.fromtimestamp(float(proceeding.proceeding_unix_time))
 
     #special case for first group that's before the first blockquote
     first_group = soup.find('style')
     groups.insert(0, first_group)
-    first_offset = int(first_group.nextSibling.nextSibling.a['onclick'].replace("top.SetPlayerPosition('0:", "").replace("',null); return false;", ""))
-    timestamp, date, am_or_pm = get_timestamp(first_group, date, am_or_pm)
-    parse_group(first_group, timestamp, proceeding, first_offset)
-
-#    groups.insert(0, first_group)
     for group in groups:
         if group.nextSibling.nextSibling:
-            offset = int(group.nextSibling.nextSibling.a['onclick'].replace("top.SetPlayerPosition('0:", "").replace("',null); return false;", ""))
+            try:
+                offset = int(group.nextSibling.nextSibling.a['onclick'].replace("top.SetPlayerPosition('0:", "").replace("',null); return false;", ""))
+            except Exception:
+                offset = None
             timestamp, date, am_or_pm = get_timestamp(group, date, am_or_pm)
-            desc_group = group.findNext('p')
+            desc_group = group#findNext('p')
             parse_group(desc_group, timestamp, proceeding, offset)
         
         else:
@@ -135,5 +144,5 @@ def grab_daily_events(clip_id):
             print group.nextSibling
             #print "\n"
                         
-#grab_daily_meta()
-grab_daily_events(4679)
+grab_daily_meta()
+grab_daily_events(1277794800)
