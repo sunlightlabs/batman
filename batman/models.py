@@ -55,7 +55,7 @@ class FloorEvent(db.Model):
         
 
 def get_or_create_floor_event(proceeding, timestamp, weight):
-    current = FloorEvent.query.filter_by(proceeding=proceeding, weight=weight).first()
+    current = FloorEvent.query.filter_by(proceeding=proceeding, weight=weight, timestamp=timestamp).first()
     if current:
         return current
     else:

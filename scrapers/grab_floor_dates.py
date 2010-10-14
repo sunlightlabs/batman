@@ -54,14 +54,39 @@ def grab_daily_events(clip_id):
     page = urllib2.urlopen(url)
     add_date = datetime.datetime.now()
     soup = BeautifulSoup(page)
-    print soup.prettify()
+   # print soup.prettify()
     date_field = soup.findAll(text=re.compile('LEGISLATIVE DAY OF'))[0].strip()
     date_string = time.strftime("%m/%d/%Y", time.strptime(date_field.replace('LEGISLATIVE DAY OF ', '').strip(), "%B %d, %Y"))
     groups = soup.findAll('blockquote')
     proceeding = FloorDate.query.filter_by(clip_id=clip_id).first() # None #needs completion
+    am_or_pm = re.findall('AM|PM', groups[0].nextSibling.nextSibling.a.string)[0]
+    if am_or_pm == 'AM': #finishing after midnight, record is being read in backwards
+        date = proceeding.proceeding_date + datetime.timedelta(days=1)
+    else:
+        date = proceeding.proceeding_date
+
     for group in groups:
         if group.nextSibling.nextSibling:
-            timestamp = None #needs completion
+            timestamp = group.nextSibling.nextSibling.a.string
+            print timestamp
+            minutes = int(re.findall('(?<=:)\d+', timestamp)[0])
+            if re.findall('PM', timestamp):
+                t_hours = int(re.findall('\d+(?=:)', timestamp)[0])
+                if t_hours != 12:
+                    hours = 12 + t_hours #convert to 24 clock
+                if am_or_pm == 'AM':
+                    date -= datetime.timedelta(days=1) #we're into the original legislative day now
+                    am_or_pm = 'PM'
+            else: 
+                hours = int(re.findall('\d+(?=:)', timestamp)[0])
+                if hours == 12:
+                    hours = 0  #12 am is 0 on 24 hours clock
+                am_or_pm = 'AM'
+            
+            timestamp = datetime.datetime(date.year, date.month, date.day, hours, minutes)
+            
+            print timestamp
+
             offset = int(group.nextSibling.nextSibling.a['onclick'].replace("top.SetPlayerPosition('0:", "").replace("',null); return false;", ""))
             print "offset: %s" % offset
             desc_group = group.findNext('p')
