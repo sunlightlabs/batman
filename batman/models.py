@@ -36,11 +36,15 @@ class FloorDate(db.Model):
 
     def save(self):
         db.session.add(self)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print e
 
 class FloorEvent(db.Model):
     __tablename__ = 'floorevent'
-    proceeding = db.Column(db.ForeignKey(FloorDate.proceeding_unix_time))
+    proceeding = db.Column(db.ForeignKey(FloorDate.proceeding_unix_time), primary_key=True)
     add_date = db.Column(db.DateTime)
     timestamp = db.Column(db.DateTime, primary_key=True)
     offset = db.Column(db.Integer)
@@ -50,7 +54,11 @@ class FloorEvent(db.Model):
 
     def save(self):
         db.session.add(self)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print e
         
 
 def get_or_create_floor_event(proceeding, timestamp, weight):

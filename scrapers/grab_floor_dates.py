@@ -59,7 +59,13 @@ def grab_daily_events(fd_unix_time):
         except:
             timestamp = item.nextSibling.nextSibling.string
 
-        minutes = int(re.findall('(?<=:)\d+', timestamp)[0])
+        try:
+            minutes = int(re.findall('(?<=:)\d+', timestamp)[0])
+        except Exception:
+            print "couldn't parse minutes for %s" % timestamp
+            return (None, date, am_or_pm)
+
+
         if re.findall('PM', timestamp):
             hours = int(re.findall('\d+(?=:)', timestamp)[0])
             if hours != 12:
@@ -77,7 +83,7 @@ def grab_daily_events(fd_unix_time):
 
     def parse_group(pt, timestamp, proceeding, offset):
         pt = group.findNext('p')
-        weight = 0
+        weight = 1
         while pt.name == 'p':
             if (len(pt.contents) > 0):
                 text = None
@@ -95,8 +101,14 @@ def grab_daily_events(fd_unix_time):
                     fe.offset = offset
                     fe.description = text.strip()
                     fe.weight = weight
+                    try:
+                        fe.save()
+                    except Exception as e:
+                        print fe
+                        print pt
+                        print "could not save, %s" % e
+                    
                     weight += 1
-                    fe.save()
                 else:
                     print "can't parse text "
                     print pt.contents
@@ -110,25 +122,36 @@ def grab_daily_events(fd_unix_time):
     page = urllib2.urlopen(url).read()
     add_date = datetime.datetime.now()
     soup = BeautifulSoup(page.replace("<p />", "</p><p>"))
-    date_field = soup.findAll(text=re.compile('LEGISLATIVE DAY OF'))[0].strip()
+    try:
+       date_field = soup.findAll(text=re.compile('LEGISLATIVE DAY OF'))[0].strip()
+    except Exception as e:
+        print "couldn't find date for FloorDate %s" % fd_unix_time
+        return
+
     date_string = time.strftime("%m/%d/%Y", time.strptime(date_field.replace('LEGISLATIVE DAY OF ', '').strip(), "%B %d, %Y"))
     groups = soup.findAll('blockquote')
+    #special case for first group that's before the first blockquote
+    first_group = soup.find('style')
+    groups.insert(0, first_group)
+    
     print proceeding.proceeding_unix_time
     
     try:
         am_or_pm = re.findall('AM|PM|A.M|P.M', groups[0].nextSibling.nextSibling.a.string)[0]
     except Exception:
         print groups[0].nextSibling.nextSibling.string
-        am_or_pm = re.findall('AM|PM|A.M|P.M', groups[0].nextSibling.nextSibling.string)[0].replace('.', '')
+        try:
+            am_or_pm = re.findall('AM|PM|A.M|P.M', groups[0].nextSibling.nextSibling.string)[0].replace('.', '')
+        except Exception:
+            print "couldn't parse timestamp for %s" % groups[0].nextSibling.nextSibling
+            print fd_unix_time
+            return
 
     if am_or_pm == 'AM': #finishing after midnight, record is being read in backwards
         date = datetime.datetime.fromtimestamp(float(proceeding.proceeding_unix_time)) + datetime.timedelta(days=1)
     else:
         date = datetime.datetime.fromtimestamp(float(proceeding.proceeding_unix_time))
 
-    #special case for first group that's before the first blockquote
-    first_group = soup.find('style')
-    groups.insert(0, first_group)
     for group in groups:
         if group.nextSibling.nextSibling:
             try:
@@ -136,8 +159,11 @@ def grab_daily_events(fd_unix_time):
             except Exception:
                 offset = None
             timestamp, date, am_or_pm = get_timestamp(group, date, am_or_pm)
-            desc_group = group#findNext('p')
-            parse_group(desc_group, timestamp, proceeding, offset)
+            if timestamp:
+                desc_group = group#findNext('p')
+                parse_group(desc_group, timestamp, proceeding, offset)
+            else:
+                continue
         
         else:
             print "no a tag"
@@ -145,4 +171,4 @@ def grab_daily_events(fd_unix_time):
             #print "\n"
                         
 grab_daily_meta()
-grab_daily_events(1277794800)
+#grab_daily_events(1268121600)
